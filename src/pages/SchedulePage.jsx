@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Filter } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Filter, FileDown } from 'lucide-react'
+import { exportSchedulePdf } from '../utils/exportPdf'
 import { addDays, subDays } from 'date-fns'
 import WeeklyCalendar from '../components/schedule/WeeklyCalendar'
 import ShiftCard from '../components/schedule/ShiftCard'
@@ -22,7 +23,7 @@ const EMPTY_SHIFT = { employeeId: '', department: '', date: '', startTime: '08:0
 
 export default function SchedulePage() {
   const { user, canManage } = useAuth()
-  const { employees, shifts, addShift, updateShift, deleteShift, hasShiftConflict, getEmployee } = useApp()
+  const { employees, shifts, absences, replacements, addShift, updateShift, deleteShift, hasShiftConflict, getEmployee } = useApp()
   const { toast } = useToast()
   const today = getTodayDate()
 
@@ -119,11 +120,20 @@ export default function SchedulePage() {
           </h2>
           <p className="text-sm text-gray-400 mt-0.5">{formatDate(weekDates[0])} – {formatDate(weekDates[6])}</p>
         </div>
-        {canManage && (
-          <button onClick={() => openAdd()} className="btn-primary text-sm">
-            <Plus size={16} /> Ajouter shift
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportSchedulePdf({ weekDates, shifts: filteredShifts, employees, absences, replacements, user })}
+            className="btn-secondary text-sm"
+            title="Exporter le planning en PDF"
+          >
+            <FileDown size={16} /> Exporter PDF
           </button>
-        )}
+          {canManage && (
+            <button onClick={() => openAdd()} className="btn-primary text-sm">
+              <Plus size={16} /> Ajouter shift
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Controls */}
