@@ -17,7 +17,6 @@ import AbsencesPage      from './pages/AbsencesPage'
 import ReplacementsPage  from './pages/ReplacementsPage'
 import EmployeesPage     from './pages/EmployeesPage'
 import DepartmentsPage   from './pages/DepartmentsPage'
-import ReportPage        from './pages/ReportPage'
 import MyProfilePage     from './pages/MyProfilePage'
 
 const MANAGER_ROLES = [ROLES.DIRECTOR, ROLES.ASSISTANT_MANAGER, ROLES.MANAGER]
@@ -81,13 +80,6 @@ function AppRoutes() {
       <Route path="/departments" element={
         <ProtectedRoute allowedRoles={MANAGER_ROLES}>
           <Layout><DepartmentsPage /></Layout>
-        </ProtectedRoute>
-      } />
-
-      {/* Report — director only (also guarded inside the page) */}
-      <Route path="/report" element={
-        <ProtectedRoute>
-          <Layout><ReportPage /></Layout>
         </ProtectedRoute>
       } />
 

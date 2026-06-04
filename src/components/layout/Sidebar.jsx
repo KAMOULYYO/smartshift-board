@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Calendar, Users, UserX, Repeat2,
-  Building2, BarChart3, Clock, LogOut, ChevronRight,
+  Building2, Clock, LogOut, ChevronRight,
   ShoppingCart, User,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
@@ -28,7 +28,6 @@ function buildNav(user, openReplacements, pendingAbsences) {
       { to: '/replacements',  icon: Repeat2,         label: 'Remplacements', badge: badges.replacements },
       { to: '/employees',     icon: Users,           label: 'Employés' },
       { to: '/departments',   icon: Building2,       label: 'Départements' },
-      { to: '/report',        icon: BarChart3,       label: 'Rapport' },
     ]
   }
 
