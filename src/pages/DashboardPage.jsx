@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Users, UserX, Repeat2, Clock, AlertTriangle, ChevronRight,
-  TrendingUp, TrendingDown, CheckCircle2, ShieldAlert, Tv2,
+  TrendingUp, TrendingDown, CheckCircle2, ShieldAlert, Tv2, Building2,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
