@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Eye, EyeOff, ShoppingCart, LogIn, AlertCircle } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -21,22 +21,46 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
+  const [retryCountdown, setRetryCountdown] = useState(0)
+
+  const doLogin = async (emailVal, passwordVal) => {
+    setLoading(true)
+    setError('')
+    const result = await login(sanitizeEmail(emailVal), sanitizeText(passwordVal, 128))
+    setLoading(false)
+    if (!result.success) {
+      setError(result.error)
+      // Auto-retry after 12s if it's a server wake-up
+      if (result.isWakeUp) {
+        setRetryCountdown(12)
+      }
+      return
+    }
+    navigate(result.redirectTo ?? '/dashboard')
+  }
+
+  // Countdown + auto-retry
+  useEffect(() => {
+    if (retryCountdown <= 0) return
+    if (retryCountdown === 1) {
+      setRetryCountdown(0)
+      doLogin(email, password)
+      return
+    }
+    const t = setTimeout(() => setRetryCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [retryCountdown])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError('')
+    setRetryCountdown(0)
     const errs = {}
     const emailErr = validateEmail(email)
     if (emailErr) errs.email = emailErr
     if (!password) errs.password = 'Mot de passe requis'
     if (Object.keys(errs).length > 0) { setFieldErrors(errs); return }
     setFieldErrors({})
-    setLoading(true)
-    await new Promise(r => setTimeout(r, 350))
-    const result = await login(sanitizeEmail(email), sanitizeText(password, 128))
-    setLoading(false)
-    if (!result.success) { setError(result.error); return }
-    navigate(result.redirectTo ?? '/dashboard')
+    await doLogin(email, password)
   }
 
   const fillDemo = (cred) => {
@@ -67,9 +91,14 @@ export default function LoginPage() {
           <p className="text-sm text-gray-400 mb-6">Accédez à votre espace de gestion</p>
 
           {error && (
-            <div className="flex items-center gap-2 p-3.5 bg-red-50 border border-red-200 rounded-xl mb-4">
-              <AlertCircle size={16} className="text-red-500 shrink-0" />
-              <p className="text-sm text-red-600 font-medium">{error}</p>
+            <div className={`flex items-center gap-2 p-3.5 rounded-xl mb-4 border ${retryCountdown > 0 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200'}`}>
+              <AlertCircle size={16} className={`shrink-0 ${retryCountdown > 0 ? 'text-amber-500' : 'text-red-500'}`} />
+              <div className="flex-1">
+                <p className={`text-sm font-medium ${retryCountdown > 0 ? 'text-amber-700' : 'text-red-600'}`}>{error}</p>
+                {retryCountdown > 0 && (
+                  <p className="text-xs text-amber-600 mt-0.5">Nouvelle tentative dans {retryCountdown}s…</p>
+                )}
+              </div>
             </div>
           )}
 

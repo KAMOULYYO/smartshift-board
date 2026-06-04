@@ -37,6 +37,14 @@ export function AuthProvider({ children }) {
       setUser(data.user)
       return { success: true, redirectTo: getDefaultRoute(data.user) }
     } catch (err) {
+      // Timeout = Render free tier waking up
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout') || !err.response) {
+        return {
+          success: false,
+          error: '⏳ Le serveur démarre… Réessayez dans 10 secondes.',
+          isWakeUp: true,
+        }
+      }
       const msg = err.response?.data?.detail ?? 'Email ou mot de passe incorrect'
       return { success: false, error: msg }
     }
