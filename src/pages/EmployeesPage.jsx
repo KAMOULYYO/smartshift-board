@@ -18,7 +18,7 @@ import {
 import { validateEmployee, hasErrors } from '../utils/validation'
 import { sanitizeEmployee } from '../utils/sanitize'
 
-const EMPTY_FORM = { name: '', email: '', phone: '', department: '', role: 'employee', note: '' }
+const EMPTY_FORM = { name: '', email: '', password: '', phone: '', department: '', role: 'employee', note: '' }
 
 // Roles selectable depending on who is logged in
 function allowedRolesForManager(user) {
@@ -75,12 +75,12 @@ export default function EmployeesPage() {
   const openEdit = (emp) => {
     if (!canManageEmployee(user, emp)) { toast.error('Action non autorisée'); return }
     setEditEmp(emp)
-    setForm({ name: emp.name, email: emp.email, phone: emp.phone || '', department: emp.department, role: emp.role, note: emp.note || '' })
+    setForm({ name: emp.name, email: emp.email, password: '', phone: emp.phone || '', department: emp.department, role: emp.role, note: emp.note || '' })
     setFormErrors({})
     setModalOpen(true)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const clean = sanitizeEmployee(form)
 
     // Managers restricted to their dept
@@ -92,16 +92,24 @@ export default function EmployeesPage() {
     }
 
     const errs = validateEmployee(clean)
+    if (!editEmp && !form.password) errs.password = 'Mot de passe requis'
+    if (form.password && form.password.length < 6) errs.password = 'Minimum 6 caractères'
     if (hasErrors(errs)) { setFormErrors(errs); return }
 
-    if (editEmp) {
-      updateEmployee(editEmp.id, clean)
-      toast.success('Employé mis à jour')
-    } else {
-      addEmployee(clean)
-      toast.success('Employé ajouté')
+    try {
+      if (editEmp) {
+        const updates = { name: clean.name, email: clean.email, phone: clean.phone, role: clean.role, department: clean.department, note: clean.note }
+        await updateEmployee(editEmp.id, updates)
+        toast.success('Employé mis à jour')
+      } else {
+        await addEmployee({ ...clean, password: form.password })
+        toast.success('Employé ajouté')
+      }
+      setModalOpen(false)
+    } catch (err) {
+      const msg = err.response?.data?.detail ?? 'Erreur lors de la sauvegarde'
+      toast.error(msg)
     }
-    setModalOpen(false)
   }
 
   const handleDelete = (emp) => {
@@ -196,6 +204,11 @@ export default function EmployeesPage() {
           <FormField label="Email" required error={formErrors.email}>
             <input type="email" className="input-field" placeholder="jean.dupont@email.fr" maxLength={254} {...field('email')} />
           </FormField>
+          {!editEmp && (
+            <FormField label="Mot de passe" required error={formErrors.password} hint="Min. 6 caractères — l'employé s'en servira pour se connecter">
+              <input type="password" className="input-field" placeholder="••••••••" maxLength={128} {...field('password')} />
+            </FormField>
+          )}
           <FormField label="Téléphone" error={formErrors.phone}>
             <input type="tel" className="input-field" placeholder="06 00 00 00 00" maxLength={20} {...field('phone')} />
           </FormField>
