@@ -117,10 +117,16 @@ export default function EmployeesPage() {
     setConfirmDelete(emp)
   }
 
-  const doDelete = () => {
-    deleteEmployee(confirmDelete.id)
-    toast.success(`${confirmDelete.name} supprimé`)
+  const doDelete = async () => {
+    const emp = confirmDelete
     setConfirmDelete(null)
+    try {
+      await deleteEmployee(emp.id)
+      toast.success(`${emp.name} supprimé`)
+    } catch (err) {
+      const msg = err.response?.data?.detail ?? 'Erreur lors de la suppression'
+      toast.error(msg)
+    }
   }
 
   const field = (key) => ({

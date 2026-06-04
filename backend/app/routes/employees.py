@@ -94,16 +94,18 @@ async def update_employee(emp_id: str, body: EmployeeUpdate, user: dict = Depend
 
 @router.delete("/{emp_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_employee(emp_id: str, user: dict = Depends(require_manager)):
+    from app.auth.dependencies import _find_user_by_id
     db = get_db()
-    doc = await db.employees.find_one({"_id": emp_id}, {"password_hash": 0})
+    doc = await _find_user_by_id(db, emp_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Employé introuvable")
-    doc["id"] = emp_id
+    real_id = doc["_id"]
+    doc["id"] = str(real_id)
     if not can_manage_employee(user, doc):
         raise HTTPException(status_code=403, detail="Accès refusé")
-    if emp_id == user["id"]:
+    if str(real_id) == user["id"]:
         raise HTTPException(status_code=400, detail="Vous ne pouvez pas supprimer votre propre compte")
-    await db.employees.delete_one({"_id": emp_id})
+    await db.employees.delete_one({"_id": real_id})
     await log_action("employee_deleted", user["id"], {"target_id": emp_id})
 
 
