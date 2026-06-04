@@ -12,7 +12,6 @@ const PAGE_TITLES = {
   '/replacements': 'Remplacements',
   '/employees':    'Employés',
   '/departments':  'Départements',
-  '/report':       'Rapport journalier',
   '/my-profile':   'Mon profil',
 }
 
