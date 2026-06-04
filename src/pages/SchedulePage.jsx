@@ -124,6 +124,14 @@ export default function SchedulePage() {
     return []
   }, [user])
 
+  const handleMoveShift = (shift, newDate) => {
+    if (!canManageShift(user, shift)) { toast.error('Action non autorisée'); return }
+    const conflict = hasShiftConflict(shift.employeeId, newDate, shift.startTime, shift.endTime, shift.id)
+    if (conflict) { toast.error('Conflit : cet employé a déjà un shift ce jour-là'); return }
+    updateShift(shift.id, { ...shift, date: newDate })
+    toast.success('Shift déplacé ✓')
+  }
+
   const openAdd = (date = today) => {
     const defaultDept = isDepartmentManager(user) ? user.department : ''
     setEditShift(null)
@@ -259,6 +267,7 @@ export default function SchedulePage() {
             onAddShift={canManage ? openAdd : null}
             onEditShift={canManage ? openEdit : null}
             onDeleteShift={canManage ? setConfirmDelete : null}
+            onMoveShift={canManage ? handleMoveShift : null}
             canManage={canManage}
             today={today}
           />
