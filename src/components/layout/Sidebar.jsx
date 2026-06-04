@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Calendar, Users, UserX, Repeat2,
   Building2, Clock, LogOut, ChevronRight,
-  ShoppingCart, User,
+  ShoppingCart, User, Settings,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useApp } from '../../context/AppContext'
@@ -28,6 +28,7 @@ function buildNav(user, openReplacements, pendingAbsences) {
       { to: '/replacements',  icon: Repeat2,         label: 'Remplacements', badge: badges.replacements },
       { to: '/employees',     icon: Users,           label: 'Employés' },
       { to: '/departments',   icon: Building2,       label: 'Départements' },
+      { to: '/settings',     icon: Settings,        label: 'Paramètres' },
     ]
   }
 

@@ -16,6 +16,7 @@ const PAGE_TITLES = {
   '/employees':    'Employés',
   '/departments':  'Départements',
   '/my-profile':   'Mon profil',
+  '/settings':     'Paramètres',
 }
 
 /* Quel skeleton afficher selon la page */

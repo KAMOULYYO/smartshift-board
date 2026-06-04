@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { AppProvider } from './context/AppContext'
@@ -20,7 +21,9 @@ import DepartmentsPage   from './pages/DepartmentsPage'
 import MyProfilePage     from './pages/MyProfilePage'
 import NotFoundPage      from './pages/NotFoundPage'
 import SharePage         from './pages/SharePage'
-import TvDashboardPage  from './pages/TvDashboardPage'
+import TvDashboardPage   from './pages/TvDashboardPage'
+import SettingsPage      from './pages/SettingsPage'
+import SplashScreen      from './components/ui/SplashScreen'
 
 const MANAGER_ROLES = [ROLES.DIRECTOR, ROLES.ASSISTANT_MANAGER, ROLES.MANAGER]
 
@@ -94,9 +97,27 @@ function AnimatedRoutes() {
         </ProtectedRoute>
       } />
 
+      {/* Paramètres — directeur uniquement */}
+      <Route path="/settings" element={
+        <ProtectedRoute allowedRoles={[ROLES.DIRECTOR]}>
+          <Layout><SettingsPage /></Layout>
+        </ProtectedRoute>
+      } />
+
       {/* 404 */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+  )
+}
+
+function AppWithSplash() {
+  const [splashDone, setSplashDone] = useState(false)
+  return (
+    <>
+      {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
+      <AnimatedRoutes />
+      <ToastContainer />
+    </>
   )
 }
 
@@ -106,8 +127,7 @@ export default function App() {
       <AuthProvider>
         <AppProvider>
           <ToastProvider>
-            <AnimatedRoutes />
-            <ToastContainer />
+            <AppWithSplash />
           </ToastProvider>
         </AppProvider>
       </AuthProvider>
