@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="40" fill="url(#g)"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#D90429"/>
+      <stop offset="100%" stop-color="#9B001E"/>
+    </linearGradient>
+  </defs>
+  <!-- Shopping cart icon -->
+  <g transform="translate(36,36)" fill="none" stroke="white" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 6h12l8 40h48"/>
+    <circle cx="38" cy="58" r="5"/>
+    <circle cx="62" cy="58" r="5"/>
+    <path d="M14 18h62l-8 28H22z"/>
+  </g>
+</svg>

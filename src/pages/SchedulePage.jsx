@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Filter, FileDown } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Filter, FileDown, Share2 } from 'lucide-react'
 import { exportSchedulePdf } from '../utils/exportPdf'
+import { useToast } from '../context/ToastContext'
 import { addDays, subDays } from 'date-fns'
 import WeeklyCalendar from '../components/schedule/WeeklyCalendar'
 import ShiftCard from '../components/schedule/ShiftCard'
@@ -25,6 +26,11 @@ export default function SchedulePage() {
   const { user, canManage } = useAuth()
   const { employees, shifts, absences, replacements, addShift, updateShift, deleteShift, hasShiftConflict, getEmployee } = useApp()
   const { toast } = useToast()
+
+  const copyShareLink = () => {
+    const url = `${window.location.origin}/share?week=${weekDates[0]}${filterDept ? `&dept=${encodeURIComponent(filterDept)}` : ''}`
+    navigator.clipboard.writeText(url).then(() => toast.success('Lien copié ! Partagez-le à votre équipe 🔗'))
+  }
   const today = getTodayDate()
 
   const [weekRef, setWeekRef] = useState(new Date(today))
@@ -122,11 +128,18 @@ export default function SchedulePage() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={copyShareLink}
+            className="btn-secondary text-sm"
+            title="Copier le lien de partage"
+          >
+            <Share2 size={16} /> Partager
+          </button>
+          <button
             onClick={() => exportSchedulePdf({ weekDates, shifts: filteredShifts, employees, absences, replacements, user })}
             className="btn-secondary text-sm"
             title="Exporter le planning en PDF"
           >
-            <FileDown size={16} /> Exporter PDF
+            <FileDown size={16} /> PDF
           </button>
           {canManage && (
             <button onClick={() => openAdd()} className="btn-primary text-sm">
