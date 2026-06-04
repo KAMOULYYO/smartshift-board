@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, Calendar, UserX, Repeat2, User, Clock,
+  LayoutDashboard, Calendar, UserX, Repeat2, User, Clock, LogOut,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useApp } from '../../context/AppContext'
@@ -10,8 +10,12 @@ import {
 } from '../../utils/permissions'
 
 export default function BottomNav() {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const { replacements, absences } = useApp()
+
+  const handleLogout = () => {
+    if (window.confirm('Voulez-vous vraiment vous déconnecter ?')) logout()
+  }
 
   const openReplacements = filterReplacementsByRole(user, replacements).filter(r => r.status === 'open').length
   const pendingAbsences  = filterAbsencesByRole(user, absences).filter(a => a.status === 'pending').length
@@ -65,6 +69,15 @@ export default function BottomNav() {
             )}
           </NavLink>
         ))}
+
+        {/* Bouton déconnexion — toujours visible sur mobile */}
+        <button
+          onClick={handleLogout}
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-xs font-semibold text-red-400 hover:text-red-600 transition-colors"
+        >
+          <LogOut size={20} strokeWidth={1.8} />
+          <span className="text-[10px] leading-none">Quitter</span>
+        </button>
       </div>
     </nav>
   )

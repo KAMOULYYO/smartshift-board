@@ -115,7 +115,10 @@ export default function EmployeesPage() {
       }
       setModalOpen(false)
     } catch (err) {
-      const msg = err.response?.data?.detail ?? 'Erreur lors de la sauvegarde'
+      const detail = err.response?.data?.detail
+      let msg = 'Erreur lors de la sauvegarde'
+      if (typeof detail === 'string') msg = detail
+      else if (Array.isArray(detail)) msg = detail.map(e => e.msg ?? e.message ?? JSON.stringify(e)).join(', ')
       toast.error(msg)
     }
   }
@@ -132,7 +135,8 @@ export default function EmployeesPage() {
       await deleteEmployee(emp.id)
       toast.success(`${emp.name} supprimé`)
     } catch (err) {
-      const msg = err.response?.data?.detail ?? 'Erreur lors de la suppression'
+      const detail = err.response?.data?.detail
+      const msg = typeof detail === 'string' ? detail : 'Erreur lors de la suppression'
       toast.error(msg)
     }
   }
