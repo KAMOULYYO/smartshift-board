@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Filter, FileDown, Share2 } from 'lucide-react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { ChevronLeft, ChevronRight, Plus, Filter, FileDown, Share2, Send, Copy, CheckCircle2, Users } from 'lucide-react'
 import { exportSchedulePdf } from '../utils/exportPdf'
+import { publishPlanning, getPlanningStatus } from '../api/planningApi'
 import { addDays, subDays } from 'date-fns'
 import WeeklyCalendar from '../components/schedule/WeeklyCalendar'
 import ShiftCard from '../components/schedule/ShiftCard'
@@ -26,17 +27,76 @@ export default function SchedulePage() {
   const { employees, shifts, absences, replacements, addShift, updateShift, deleteShift, hasShiftConflict, getEmployee } = useApp()
   const { toast } = useToast()
 
-  const copyShareLink = () => {
-    const url = `${window.location.origin}/share?week=${weekDates[0]}${filterDept ? `&dept=${encodeURIComponent(filterDept)}` : ''}`
-    navigator.clipboard.writeText(url).then(() => toast.success('Lien copié ! Partagez-le à votre équipe 🔗'))
-  }
   const today = getTodayDate()
 
   const [weekRef, setWeekRef] = useState(new Date(today))
   const weekDates = useMemo(() => getWeekDates(weekRef), [weekRef])
 
   const [filterDept, setFilterDept] = useState('')
-  const [modalOpen, setModalOpen] = useState(false)
+  const [modalOpen, setModalOpen]   = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [planStatus, setPlanStatus] = useState(null)
+  const [copyingWeek, setCopyingWeek] = useState(false)
+
+  // Statut publication semaine courante
+  const weekStart = useMemo(() => {
+    const d = new Date(weekRef)
+    const day = d.getDay()
+    const diff = day === 0 ? -6 : 1 - day
+    d.setDate(d.getDate() + diff)
+    return d.toISOString().slice(0, 10)
+  }, [weekRef])
+
+  const loadPlanStatus = useCallback(async () => {
+    try { const r = await getPlanningStatus(weekStart); setPlanStatus(r.data) }
+    catch { setPlanStatus(null) }
+  }, [weekStart])
+
+  useEffect(() => { loadPlanStatus() }, [loadPlanStatus])
+
+  const handlePublish = async () => {
+    setPublishing(true)
+    try {
+      const dept = isDepartmentManager(user) ? user.department : ''
+      await publishPlanning(weekStart, dept)
+      toast.success('📢 Planning publié ! Les employés peuvent maintenant le confirmer.')
+      await loadPlanStatus()
+    } catch (err) {
+      toast.error(err.response?.data?.detail ?? 'Erreur lors de la publication')
+    } finally { setPublishing(false) }
+  }
+
+  const copyShareLink = () => {
+    const url = `${window.location.origin}/share?week=${weekDates[0]}${filterDept ? `&dept=${encodeURIComponent(filterDept)}` : ''}`
+    navigator.clipboard.writeText(url).then(() => toast.success('Lien copié ! Partagez-le à votre équipe 🔗'))
+  }
+
+  // Copier les shifts de la semaine précédente vers la semaine actuelle
+  const copyPreviousWeek = async () => {
+    const prevWeekDates = weekDates.map(d => {
+      const prev = new Date(d)
+      prev.setDate(prev.getDate() - 7)
+      return prev.toISOString().slice(0, 10)
+    })
+    const prevShifts = visibleShifts.filter(s => prevWeekDates.includes(s.date))
+    if (prevShifts.length === 0) { toast.error('Aucun shift la semaine précédente à copier'); return }
+    const existing = filteredShifts.length
+    if (existing > 0 && !window.confirm(`Cette semaine contient déjà ${existing} shift(s). Ajouter quand même ?`)) return
+
+    setCopyingWeek(true)
+    try {
+      let copied = 0
+      for (const s of prevShifts) {
+        const newDate = weekDates[prevWeekDates.indexOf(s.date)]
+        if (!newDate) continue
+        try {
+          await addShift({ employeeId: s.employeeId, department: s.department, date: newDate, startTime: s.startTime, endTime: s.endTime, status: 'planned', note: s.note })
+          copied++
+        } catch {}
+      }
+      toast.success(`✅ ${copied} shift(s) copiés depuis la semaine précédente`)
+    } finally { setCopyingWeek(false) }
+  }
   const [editShift, setEditShift] = useState(null)
   const [form, setForm] = useState({ ...EMPTY_SHIFT })
   const [formErrors, setFormErrors] = useState({})
@@ -125,21 +185,24 @@ export default function SchedulePage() {
           </h2>
           <p className="text-sm text-gray-400 mt-0.5">{formatDate(weekDates[0])} – {formatDate(weekDates[6])}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={copyShareLink}
-            className="btn-secondary text-sm"
-            title="Copier le lien de partage"
-          >
+        <div className="flex flex-wrap items-center gap-2">
+          {canManage && (
+            <button onClick={copyPreviousWeek} disabled={copyingWeek} className="btn-secondary text-sm" title="Copier les shifts de la semaine précédente">
+              <Copy size={16} /> {copyingWeek ? 'Copie…' : 'Copier sem. préc.'}
+            </button>
+          )}
+          <button onClick={copyShareLink} className="btn-secondary text-sm" title="Copier le lien de partage">
             <Share2 size={16} /> Partager
           </button>
-          <button
-            onClick={() => exportSchedulePdf({ weekDates, shifts: filteredShifts, employees, absences, replacements, user })}
-            className="btn-secondary text-sm"
-            title="Exporter le planning en PDF"
-          >
+          <button onClick={() => exportSchedulePdf({ weekDates, shifts: filteredShifts, employees, absences, replacements, user })} className="btn-secondary text-sm">
             <FileDown size={16} /> PDF
           </button>
+          {canManage && (
+            <button onClick={handlePublish} disabled={publishing} className={`text-sm ${planStatus?.published ? 'btn-secondary' : 'btn-primary'}`}>
+              {planStatus?.published ? <CheckCircle2 size={16} /> : <Send size={16} />}
+              {publishing ? 'Publication…' : planStatus?.published ? 'Republier' : 'Publier le planning'}
+            </button>
+          )}
           {canManage && (
             <button onClick={() => openAdd()} className="btn-primary text-sm">
               <Plus size={16} /> Ajouter shift
@@ -147,6 +210,23 @@ export default function SchedulePage() {
           )}
         </div>
       </div>
+
+      {/* Bannière statut publication */}
+      {planStatus?.published && (
+        <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-2xl">
+          <CheckCircle2 size={18} className="text-green-500 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-bold text-green-800">Planning publié ✓</p>
+            <p className="text-xs text-green-600">
+              {planStatus.total_confirmed} employé{planStatus.total_confirmed > 1 ? 's ont' : ' a'} confirmé · Les employés voient maintenant leur planning
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-100 px-3 py-1.5 rounded-xl">
+            <Users size={13} />
+            {planStatus.total_confirmed} confirmé{planStatus.total_confirmed > 1 ? 's' : ''}
+          </div>
+        </div>
+      )}
 
       {/* Controls */}
       <div className="card p-3 flex flex-wrap items-center gap-3">

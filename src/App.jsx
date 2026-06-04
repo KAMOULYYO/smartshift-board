@@ -20,6 +20,7 @@ import DepartmentsPage   from './pages/DepartmentsPage'
 import MyProfilePage     from './pages/MyProfilePage'
 import NotFoundPage      from './pages/NotFoundPage'
 import SharePage         from './pages/SharePage'
+import TvDashboardPage  from './pages/TvDashboardPage'
 
 const MANAGER_ROLES = [ROLES.DIRECTOR, ROLES.ASSISTANT_MANAGER, ROLES.MANAGER]
 
@@ -34,6 +35,9 @@ function AnimatedRoutes() {
 
       {/* Planning partagé — public, sans auth */}
       <Route path="/share" element={<SharePage />} />
+
+      {/* Mode TV — plein écran, sans sidebar */}
+      <Route path="/tv" element={<TvDashboardPage />} />
 
       {/* Dashboard */}
       <Route path="/dashboard" element={

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Users, UserX, Repeat2, Clock, AlertTriangle, ChevronRight,
-  TrendingUp, TrendingDown, CheckCircle2, ShieldAlert,
+  TrendingUp, TrendingDown, CheckCircle2, ShieldAlert, Tv2,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -131,6 +131,10 @@ function DirectorDashboard({ user, employees, shifts, absences, replacements, al
             <p className="text-gray-300 mt-1 text-sm">Vue complète du magasin · Direction</p>
           </div>
 
+          <div className="flex flex-col items-end gap-3">
+            <Link to="/tv" target="_blank" className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shrink-0">
+              <Tv2 size={16} /> Mode TV
+            </Link>
           <div className="flex items-center gap-6">
             <div className="text-center">
               <p className="text-4xl font-black text-white">{employees.length}</p>
@@ -146,6 +150,7 @@ function DirectorDashboard({ user, employees, shifts, absences, replacements, al
               <p className="text-4xl font-black text-green-300">{Math.round(weekHours)}h</p>
               <p className="text-xs text-gray-400 mt-0.5">Cette semaine</p>
             </div>
+          </div>
           </div>
         </div>
       </div>
