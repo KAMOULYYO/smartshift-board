@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Calendar, Users, UserX, Repeat2,
   Building2, Clock, LogOut, ChevronRight,
-  ShoppingCart, User, Settings,
+  ShoppingCart, User, Settings, Info,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useApp } from '../../context/AppContext'
@@ -29,6 +29,7 @@ function buildNav(user, openReplacements, pendingAbsences) {
       { to: '/employees',     icon: Users,           label: 'Employés' },
       { to: '/departments',   icon: Building2,       label: 'Départements' },
       { to: '/settings',     icon: Settings,        label: 'Paramètres' },
+      { to: '/about',        icon: Info,            label: 'À propos' },
     ]
   }
 
@@ -40,6 +41,7 @@ function buildNav(user, openReplacements, pendingAbsences) {
       { to: '/absences',      icon: UserX,           label: 'Absences',      badge: badges.absences },
       { to: '/replacements',  icon: Repeat2,         label: 'Remplacements', badge: badges.replacements },
       { to: '/employees',     icon: Users,           label: 'Mon équipe' },
+      { to: '/about',        icon: Info,            label: 'À propos' },
     ]
   }
 
@@ -49,11 +51,15 @@ function buildNav(user, openReplacements, pendingAbsences) {
     { to: '/availability',    icon: Clock,     label: 'Mes disponibilités' },
     { to: '/absences',        icon: UserX,     label: 'Mes absences' },
     { to: '/my-profile',      icon: User,      label: 'Mon profil' },
+    { to: '/about',           icon: Info,      label: 'À propos' },
   ]
 }
 
 export default function Sidebar({ collapsed, onClose }) {
   const { user, logout } = useAuth()
+  const handleLogout = () => {
+    if (window.confirm('Voulez-vous vraiment vous déconnecter ?')) logout()
+  }
   const { replacements, absences } = useApp()
 
   const openReplacements = filterReplacementsByRole(user, replacements).filter(r => r.status === 'open').length
@@ -133,7 +139,7 @@ export default function Sidebar({ collapsed, onClose }) {
             </div>
           </div>
           <button
-            onClick={logout}
+            onClick={handleLogout}
             className="sidebar-link sidebar-link-inactive w-full text-red-500 hover:bg-red-50 hover:text-red-600"
           >
             <LogOut size={16} />

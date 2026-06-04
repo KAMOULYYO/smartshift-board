@@ -19,17 +19,21 @@ import ReplacementsPage  from './pages/ReplacementsPage'
 import EmployeesPage     from './pages/EmployeesPage'
 import DepartmentsPage   from './pages/DepartmentsPage'
 import MyProfilePage     from './pages/MyProfilePage'
-import NotFoundPage      from './pages/NotFoundPage'
-import SharePage         from './pages/SharePage'
-import TvDashboardPage   from './pages/TvDashboardPage'
-import SettingsPage      from './pages/SettingsPage'
-import SplashScreen      from './components/ui/SplashScreen'
+import NotFoundPage          from './pages/NotFoundPage'
+import SharePage             from './pages/SharePage'
+import TvDashboardPage       from './pages/TvDashboardPage'
+import SettingsPage          from './pages/SettingsPage'
+import SplashScreen          from './components/ui/SplashScreen'
+import EmployeeProfilePage   from './pages/EmployeeProfilePage'
+import AboutPage             from './pages/AboutPage'
+import { usePageTitle }      from './hooks/usePageTitle'
 
 const MANAGER_ROLES = [ROLES.DIRECTOR, ROLES.ASSISTANT_MANAGER, ROLES.MANAGER]
 
 /* Wrapper d'animation de transition entre pages */
 function AnimatedRoutes() {
   const location = useLocation()
+  usePageTitle()
 
   return (
     <Routes location={location} key={location.pathname}>
@@ -94,6 +98,16 @@ function AnimatedRoutes() {
       <Route path="/my-profile" element={
         <ProtectedRoute>
           <Layout><MyProfilePage /></Layout>
+        </ProtectedRoute>
+      } />
+
+      {/* Page About — publique */}
+      <Route path="/about" element={<AboutPage />} />
+
+      {/* Profil employé */}
+      <Route path="/employees/:empId" element={
+        <ProtectedRoute>
+          <Layout><EmployeeProfilePage /></Layout>
         </ProtectedRoute>
       } />
 

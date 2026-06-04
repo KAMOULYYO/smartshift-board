@@ -24,9 +24,11 @@ export default function AbsencesPage() {
   const { employees, absences, addAbsence, updateAbsenceStatus, deleteAbsence, getEmployee } = useApp()
   const { toast } = useToast()
 
-  const [search, setSearch] = useState('')
+  const [search, setSearch]         = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterDept, setFilterDept] = useState('')
+  const [filterDateFrom, setFilterDateFrom] = useState('')
+  const [filterDateTo, setFilterDateTo]     = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [formErrors, setFormErrors] = useState({})
@@ -46,10 +48,12 @@ export default function AbsencesPage() {
         a.comment?.toLowerCase().includes(q)
       )
     }
-    if (filterStatus) list = list.filter(a => a.status === filterStatus)
-    if (filterDept) list = list.filter(a => a.department === filterDept)
-    return list
-  }, [visibleAbsences, search, filterStatus, filterDept, getEmployee])
+    if (filterStatus)   list = list.filter(a => a.status === filterStatus)
+    if (filterDept)     list = list.filter(a => a.department === filterDept)
+    if (filterDateFrom) list = list.filter(a => a.date >= filterDateFrom)
+    if (filterDateTo)   list = list.filter(a => a.date <= filterDateTo)
+    return list.sort((a, b) => b.date.localeCompare(a.date))
+  }, [visibleAbsences, search, filterStatus, filterDept, filterDateFrom, filterDateTo, getEmployee])
 
   const availableDepts = useMemo(() => {
     if (isDirector(user)) return DEPARTMENTS
@@ -133,6 +137,13 @@ export default function AbsencesPage() {
             <option value="">Tous les dép.</option>
             {availableDepts.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
+        )}
+        <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="input-field text-sm w-auto" title="Date de début" />
+        <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="input-field text-sm w-auto" title="Date de fin" />
+        {(filterDateFrom || filterDateTo) && (
+          <button onClick={() => { setFilterDateFrom(''); setFilterDateTo('') }} className="text-xs text-red-500 font-semibold hover:text-red-600 whitespace-nowrap">
+            Effacer dates
+          </button>
         )}
       </div>
 

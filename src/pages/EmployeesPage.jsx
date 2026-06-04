@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Plus, Search, Users } from 'lucide-react'
+import Pagination from '../components/ui/Pagination'
 import EmployeeTable from '../components/employees/EmployeeTable'
 import Modal from '../components/ui/Modal'
 import ConfirmModal from '../components/ui/ConfirmModal'
@@ -37,9 +38,11 @@ export default function EmployeesPage() {
     return <AccessDenied message="La liste des employés est réservée aux managers et à la direction." />
   }
 
-  const [search, setSearch]       = useState('')
+  const [search, setSearch]         = useState('')
   const [filterDept, setFilterDept] = useState('')
   const [filterRole, setFilterRole] = useState('')
+  const [page, setPage]             = useState(1)
+  const PAGE_SIZE = 10
   const [modalOpen, setModalOpen] = useState(false)
   const [editEmp, setEditEmp]     = useState(null)
   const [form, setForm]           = useState({ ...EMPTY_FORM })
@@ -56,6 +59,11 @@ export default function EmployeesPage() {
     if (filterRole) list = list.filter(e => e.role === filterRole)
     return list
   }, [visibleEmployees, search, filterDept, filterRole])
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return filtered.slice(start, start + PAGE_SIZE)
+  }, [filtered, page])
 
   const availableDepts = useMemo(() => {
     if (isDirector(user)) return DEPARTMENTS
@@ -192,12 +200,15 @@ export default function EmployeesPage() {
             action={canManage && <button onClick={openAdd} className="btn-primary text-sm"><Plus size={15} /> Ajouter</button>}
           />
         ) : (
-          <EmployeeTable
-            employees={filtered}
-            onEdit={openEdit}
-            onDelete={handleDelete}
-            canManage={canManage}
-          />
+          <>
+            <EmployeeTable
+              employees={paginated}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+              canManage={canManage}
+            />
+            <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={p => { setPage(p); window.scrollTo(0,0) }} />
+          </>
         )}
       </div>
 
