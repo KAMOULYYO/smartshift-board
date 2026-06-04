@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException, status, Depends
-from bson import ObjectId
 from app.auth.dependencies import get_current_user, require_manager, require_director
 from app.schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeOut, PasswordChange
 from app.auth.security import hash_password, verify_password
 from app.utils.permissions import can_view_employee, can_manage_employee, is_director, is_department_manager
 from app.utils.audit import log_action
+from app.utils.id import new_id
 from app.database import get_db
 
 router = APIRouter(prefix="/employees", tags=["employees"])
@@ -40,10 +40,10 @@ async def create_employee(body: EmployeeCreate, user: dict = Depends(require_man
     if existing:
         raise HTTPException(status_code=409, detail="Cet email est déjà utilisé")
     doc = body.model_dump()
+    doc["_id"] = new_id()          # UUID string → find_one({"_id": id}) works correctly
     doc["email"] = doc["email"].lower()
     doc["password_hash"] = hash_password(doc.pop("password"))
-    result = await db.employees.insert_one(doc)
-    doc["_id"] = result.inserted_id
+    await db.employees.insert_one(doc)
     await log_action("employee_created", user["id"], {"target_email": doc["email"]})
     return _out(doc)
 
