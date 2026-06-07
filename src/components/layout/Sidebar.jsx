@@ -60,10 +60,9 @@ export default function Sidebar({ collapsed, onClose }) {
   const handleLogout = () => {
     if (window.confirm('Voulez-vous vraiment vous déconnecter ?')) logout()
   }
-  const { replacements, absences } = useApp()
-  const customLogo = localStorage.getItem('ssb_logo')
-  const settings = (() => { try { return JSON.parse(localStorage.getItem('ssb_settings') ?? '{}') } catch { return {} } })()
-  const storeName = settings.storeName || 'SmartShift'
+  const { replacements, absences, appSettings } = useApp()
+  const customLogo = appSettings?.logo ?? null
+  const storeName = appSettings?.storeName || 'SmartShift'
 
   const openReplacements = filterReplacementsByRole(user, replacements).filter(r => r.status === 'open').length
   const pendingAbsences  = filterAbsencesByRole(user, absences).filter(a => a.status === 'pending').length

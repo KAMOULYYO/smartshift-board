@@ -4,6 +4,7 @@ import * as shiftsApi from '../api/shiftsApi'
 import * as absencesApi from '../api/absencesApi'
 import * as replacementsApi from '../api/replacementsApi'
 import * as availabilitiesApi from '../api/availabilitiesApi'
+import { getAppSettings, saveAppSettings } from '../api/settingsApi'
 import { calcShiftHours } from '../utils/helpers'
 import { useAuth } from './AuthContext'
 
@@ -107,6 +108,9 @@ export function AppProvider({ children }) {
   const [availabilities, setAvailabilities] = useState([])
   const [alerts, setAlerts] = useState([])
   const [dataLoading, setDataLoading] = useState(false)
+  const [appSettings, setAppSettings] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ssb_settings') ?? '{}') } catch { return {} }
+  })
 
   // Fetch all data once user is authenticated
   useEffect(() => {
@@ -159,6 +163,15 @@ export function AppProvider({ children }) {
       })
       .catch(() => {})
       .finally(() => setDataLoading(false))
+
+    // Load global app settings (logo, store name…)
+    getAppSettings().then(s => {
+      setAppSettings(s)
+      if (s.storeName) {
+        const local = JSON.parse(localStorage.getItem('ssb_settings') ?? '{}')
+        localStorage.setItem('ssb_settings', JSON.stringify({ ...local, ...s }))
+      }
+    }).catch(() => {})
   }, [user])
 
   const getEmployee = useCallback((id) => employees.find(e => e.id === id), [employees])
@@ -315,9 +328,17 @@ export function AppProvider({ children }) {
     setAlerts(prev => prev.filter(a => a.id !== id))
   }, [])
 
+  const updateAppSettings = useCallback(async (data) => {
+    await saveAppSettings(data)
+    setAppSettings(prev => ({ ...prev, ...data }))
+    const local = JSON.parse(localStorage.getItem('ssb_settings') ?? '{}')
+    localStorage.setItem('ssb_settings', JSON.stringify({ ...local, ...data }))
+  }, [])
+
   return (
     <AppContext.Provider value={{
       dataLoading,
+      appSettings, updateAppSettings,
       employees, getEmployee, addEmployee, updateEmployee, deleteEmployee,
       shifts, addShift, updateShift, deleteShift, hasShiftConflict,
       absences, addAbsence, updateAbsenceStatus, deleteAbsence,

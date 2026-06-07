@@ -16,6 +16,7 @@ from app.routes.availabilities import router as availabilities_router
 from app.routes.dashboard import router as dashboard_router
 from app.routes.reports import router as reports_router
 from app.routes.planning import router as planning_router
+from app.routes.settings import router as settings_router
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -57,6 +58,7 @@ app.include_router(availabilities_router, prefix=API_PREFIX)
 app.include_router(dashboard_router,      prefix=API_PREFIX)
 app.include_router(reports_router,        prefix=API_PREFIX)
 app.include_router(planning_router,       prefix=API_PREFIX)
+app.include_router(settings_router,      prefix=API_PREFIX)
 
 
 @app.get("/api/health")

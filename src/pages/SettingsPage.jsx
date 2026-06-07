@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { useApp } from '../context/AppContext'
 import AccessDenied from '../components/ui/AccessDenied'
 import { isDirector } from '../utils/permissions'
 
@@ -151,38 +152,33 @@ function ChangelogEntry({ entry }) {
 export default function SettingsPage() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const { appSettings, updateAppSettings } = useApp()
 
   if (!isDirector(user)) {
     return <AccessDenied message="Les paramètres sont réservés à la direction." />
   }
 
-  const [settings, setSettings] = useState(() => {
-    try {
-      const saved = localStorage.getItem('ssb_settings')
-      return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS
-    } catch { return DEFAULT_SETTINGS }
-  })
-
+  const [settings, setSettings] = useState(() => ({ ...DEFAULT_SETTINGS, ...appSettings }))
   const [saved, setSaved] = useState(false)
-  const [logo, setLogo] = useState(() => localStorage.getItem('ssb_logo') ?? null)
+  const [logo, setLogo] = useState(() => appSettings.logo ?? null)
   const [dragOver, setDragOver] = useState(false)
 
   const handleLogoFile = (file) => {
     if (!file || !file.type.startsWith('image/')) { toast.error('Fichier image invalide'); return }
     if (file.size > 2 * 1024 * 1024) { toast.error('Image trop lourde (max 2 Mo)'); return }
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       setLogo(e.target.result)
-      localStorage.setItem('ssb_logo', e.target.result)
-      toast.success('Logo enregistré ✓')
+      await updateAppSettings({ logo: e.target.result })
+      toast.success('Logo enregistré pour tous ✓')
     }
     reader.readAsDataURL(file)
   }
 
-  const removeLogo = () => {
+  const removeLogo = async () => {
     setLogo(null)
-    localStorage.removeItem('ssb_logo')
-    toast.success('Logo supprimé')
+    await updateAppSettings({ logo: null })
+    toast.success('Logo supprimé pour tous')
   }
 
   const update = (key, val) => setSettings(s => ({ ...s, [key]: val }))
@@ -194,10 +190,10 @@ export default function SettingsPage() {
     }))
   }
 
-  const handleSave = () => {
-    localStorage.setItem('ssb_settings', JSON.stringify(settings))
+  const handleSave = async () => {
+    await updateAppSettings({ ...settings, logo: logo ?? null })
     setSaved(true)
-    toast.success('⚙️ Paramètres enregistrés')
+    toast.success('⚙️ Paramètres enregistrés pour tous ✓')
     setTimeout(() => setSaved(false), 2000)
   }
 
