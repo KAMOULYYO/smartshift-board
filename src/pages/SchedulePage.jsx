@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Filter, FileDown, Share2, Send, Copy, CheckCircle2, Users, Trash2, Zap, LayoutGrid, List, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Filter, FileDown, Share2, Send, Copy, CheckCircle2, Users, Trash2, Zap, LayoutGrid, List, RefreshCw, Camera } from 'lucide-react'
 import { exportSchedulePdf } from '../utils/exportPdf'
 import { publishPlanning, getPlanningStatus } from '../api/planningApi'
 import { addDays, subDays } from 'date-fns'
 import WeeklyCalendar from '../components/schedule/WeeklyCalendar'
+import ImportPhotoModal from '../components/schedule/ImportPhotoModal'
 import ShiftCard from '../components/schedule/ShiftCard'
 import Modal from '../components/ui/Modal'
 import ConfirmModal from '../components/ui/ConfirmModal'
@@ -126,6 +127,19 @@ export default function SchedulePage() {
 
   const [resetting, setResetting] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [importModalOpen, setImportModalOpen] = useState(false)
+
+  const handleImportShifts = (shiftList) => {
+    let added = 0
+    for (const s of shiftList) {
+      const conflict = hasShiftConflict(s.employeeId, s.date, s.start_time, s.end_time, null)
+      if (!conflict) {
+        addShift({ employeeId: s.employeeId, department: s.department, date: s.date, startTime: s.start_time, endTime: s.end_time, status: 'planned', note: '' })
+        added++
+      }
+    }
+    toast.success(`✅ ${added} shift${added > 1 ? 's' : ''} importé${added > 1 ? 's' : ''} depuis la photo !`)
+  }
 
   const resetWeek = async () => {
     setResetting(true)
@@ -249,6 +263,12 @@ export default function SchedulePage() {
 
           {/* Boutons à droite */}
           <div className="flex flex-wrap gap-2">
+            {canManage && (
+              <button onClick={() => setImportModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded-xl text-xs font-bold transition-all border border-purple-500/30">
+                <Camera size={13} /> Importer photo IA
+              </button>
+            )}
             {canManage && (
               <button onClick={copyPreviousWeek} disabled={copyingWeek}
                 className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-semibold transition-all border border-white/10">
@@ -420,6 +440,14 @@ export default function SchedulePage() {
         confirmLabel="Supprimer"
         onConfirm={handleDelete}
         onCancel={() => setConfirmDelete(null)}
+      />
+
+      <ImportPhotoModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        weekStart={weekStart}
+        employees={employees}
+        onImportShifts={handleImportShifts}
       />
 
       <ConfirmModal
