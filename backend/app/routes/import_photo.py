@@ -59,7 +59,7 @@ Si tu ne vois aucun shift, retourne [].
     try:
         client = anthropic.Anthropic(api_key=api_key)
         message = client.messages.create(
-            model="claude-3-5-haiku-20241022",
+            model="claude-3-5-sonnet-20241022",
             max_tokens=4096,
             messages=[{
                 "role": "user",
