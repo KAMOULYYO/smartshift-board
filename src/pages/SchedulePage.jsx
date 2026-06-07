@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Filter, FileDown, Share2, Send, Copy, CheckCircle2, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Filter, FileDown, Share2, Send, Copy, CheckCircle2, Users, Trash2, Zap, LayoutGrid, List, RefreshCw } from 'lucide-react'
 import { exportSchedulePdf } from '../utils/exportPdf'
 import { publishPlanning, getPlanningStatus } from '../api/planningApi'
 import { addDays, subDays } from 'date-fns'
@@ -124,6 +124,20 @@ export default function SchedulePage() {
     return []
   }, [user])
 
+  const [resetting, setResetting] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
+
+  const resetWeek = async () => {
+    setResetting(true)
+    const weekShifts = shifts.filter(s => weekDates.includes(s.date))
+    for (const s of weekShifts) {
+      if (canManageShift(user, s)) deleteShift(s.id)
+    }
+    setResetting(false)
+    setConfirmReset(false)
+    toast.success(`🗑️ ${weekShifts.length} shift${weekShifts.length > 1 ? 's' : ''} supprimé${weekShifts.length > 1 ? 's' : ''} — semaine réinitialisée`)
+  }
+
   const handleMoveShift = (shift, newDate) => {
     if (!canManageShift(user, shift)) { toast.error('Action non autorisée'); return }
     const conflict = hasShiftConflict(shift.employeeId, newDate, shift.startTime, shift.endTime, shift.id)
@@ -186,40 +200,94 @@ export default function SchedulePage() {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="page-title">
-            {isDepartmentManager(user) ? `Horaires — ${user.department}` : 'Horaires de la semaine'}
-          </h2>
-          <p className="text-sm text-gray-400 mt-0.5">{formatDate(weekDates[0])} – {formatDate(weekDates[6])}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {canManage && (
-            <button onClick={copyPreviousWeek} disabled={copyingWeek} className="btn-secondary text-sm" title="Copier les shifts de la semaine précédente">
-              <Copy size={16} /> {copyingWeek ? 'Copie…' : 'Copier sem. préc.'}
+
+      {/* ── Hero Banner technologique ── */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6 text-white shadow-xl">
+        {/* Grille déco */}
+        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.3) 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl" />
+
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <span className="text-xs text-gray-400 font-mono uppercase tracking-widest">Planning actif</span>
+            </div>
+            <h2 className="text-2xl font-black tracking-tight">
+              {isDepartmentManager(user) ? `Horaires — ${user.department}` : 'Horaires de la semaine'}
+            </h2>
+            <p className="text-gray-400 text-sm mt-1 font-mono">{formatDate(weekDates[0])} → {formatDate(weekDates[6])}</p>
+
+            {/* Stats inline */}
+            <div className="flex items-center gap-4 mt-4">
+              <div className="text-center">
+                <p className="text-2xl font-black text-white">{filteredShifts.length}</p>
+                <p className="text-xs text-gray-500">shifts</p>
+              </div>
+              <div className="w-px h-8 bg-gray-700" />
+              <div className="text-center">
+                <p className="text-2xl font-black text-white">{[...new Set(filteredShifts.map(s => s.employeeId))].length}</p>
+                <p className="text-xs text-gray-500">employés</p>
+              </div>
+              <div className="w-px h-8 bg-gray-700" />
+              <div className="text-center">
+                <p className="text-2xl font-black text-white">{weekDates.filter(d => filteredShifts.some(s => s.date === d)).length}/7</p>
+                <p className="text-xs text-gray-500">jours couverts</p>
+              </div>
+              {planStatus?.published && (
+                <>
+                  <div className="w-px h-8 bg-gray-700" />
+                  <div className="text-center">
+                    <p className="text-2xl font-black text-green-400">{planStatus.total_confirmed}</p>
+                    <p className="text-xs text-gray-500">confirmés</p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Boutons à droite */}
+          <div className="flex flex-wrap gap-2">
+            {canManage && (
+              <button onClick={copyPreviousWeek} disabled={copyingWeek}
+                className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-semibold transition-all border border-white/10">
+                <RefreshCw size={13} className={copyingWeek ? 'animate-spin' : ''} />
+                {copyingWeek ? 'Copie…' : 'Copier sem. préc.'}
+              </button>
+            )}
+            <button onClick={copyShareLink}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-semibold transition-all border border-white/10">
+              <Share2 size={13} /> Partager
             </button>
-          )}
-          <button onClick={copyShareLink} className="btn-secondary text-sm" title="Copier le lien de partage">
-            <Share2 size={16} /> Partager
-          </button>
-          <button onClick={() => exportSchedulePdf({ weekDates, shifts: filteredShifts, employees, absences, replacements, user })} className="btn-secondary text-sm">
-            <FileDown size={16} /> PDF
-          </button>
-          {canManage && (
-            <button onClick={handlePublish} disabled={publishing} className={`text-sm ${planStatus?.published ? 'btn-secondary' : 'btn-primary'}`}>
-              {planStatus?.published ? <CheckCircle2 size={16} /> : <Send size={16} />}
-              {publishing ? 'Publication…' : planStatus?.published ? 'Republier' : 'Publier le planning'}
+            <button onClick={() => exportSchedulePdf({ weekDates, shifts: filteredShifts, employees, absences, replacements, user })}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-semibold transition-all border border-white/10">
+              <FileDown size={13} /> PDF
             </button>
-          )}
-          {canManage && (
-            <button onClick={() => openAdd()} className="btn-primary text-sm">
-              <Plus size={16} /> Ajouter shift
-            </button>
-          )}
+            {canManage && filteredShifts.length > 0 && (
+              <button onClick={() => setConfirmReset(true)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-xl text-xs font-semibold transition-all border border-red-500/20">
+                <Trash2 size={13} /> Réinitialiser
+              </button>
+            )}
+            {canManage && (
+              <button onClick={handlePublish} disabled={publishing}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${planStatus?.published ? 'bg-green-500/20 text-green-300 border border-green-500/20' : 'bg-red-500 hover:bg-red-600 text-white'}`}>
+                {planStatus?.published ? <CheckCircle2 size={13} /> : <Send size={13} />}
+                {publishing ? 'Publication…' : planStatus?.published ? 'Republié ✓' : 'Publier'}
+              </button>
+            )}
+            {canManage && (
+              <button onClick={() => openAdd()}
+                className="flex items-center gap-1.5 px-4 py-2 bg-white text-gray-900 rounded-xl text-xs font-bold hover:bg-gray-100 transition-all">
+                <Plus size={13} /> Ajouter shift
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Bannière statut publication */}
+      {/* ── Bannière publication ── */}
       {planStatus?.published && (
         <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-2xl">
           <CheckCircle2 size={18} className="text-green-500 shrink-0" />
@@ -229,19 +297,15 @@ export default function SchedulePage() {
               {planStatus.total_confirmed} employé{planStatus.total_confirmed > 1 ? 's ont' : ' a'} confirmé · Les employés voient maintenant leur planning
             </p>
           </div>
-          <div className="flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-100 px-3 py-1.5 rounded-xl">
-            <Users size={13} />
-            {planStatus.total_confirmed} confirmé{planStatus.total_confirmed > 1 ? 's' : ''}
-          </div>
         </div>
       )}
 
-      {/* Controls */}
+      {/* ── Controls ── */}
       <div className="card p-3 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <button onClick={() => setWeekRef(d => subDays(d, 7))} className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors"><ChevronLeft size={18} /></button>
-          <button onClick={() => setWeekRef(new Date(today))} className="btn-ghost text-sm px-3 py-1.5">Aujourd'hui</button>
-          <button onClick={() => setWeekRef(d => addDays(d, 7))} className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors"><ChevronRight size={18} /></button>
+        <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+          <button onClick={() => setWeekRef(d => subDays(d, 7))} className="p-1.5 rounded-lg text-gray-500 hover:bg-white hover:shadow-sm transition-all"><ChevronLeft size={16} /></button>
+          <button onClick={() => setWeekRef(new Date(today))} className="px-3 py-1.5 rounded-lg text-xs font-bold text-gray-600 hover:bg-white hover:shadow-sm transition-all">Aujourd'hui</button>
+          <button onClick={() => setWeekRef(d => addDays(d, 7))} className="p-1.5 rounded-lg text-gray-500 hover:bg-white hover:shadow-sm transition-all"><ChevronRight size={16} /></button>
         </div>
         {availableDepts.length > 1 && (
           <div className="flex items-center gap-2 flex-1">
@@ -252,9 +316,13 @@ export default function SchedulePage() {
             </select>
           </div>
         )}
-        <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
-          <button onClick={() => setView('calendar')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === 'calendar' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>Calendrier</button>
-          <button onClick={() => setView('list')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>Liste</button>
+        <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 ml-auto">
+          <button onClick={() => setView('calendar')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === 'calendar' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
+            <LayoutGrid size={13} /> Calendrier
+          </button>
+          <button onClick={() => setView('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
+            <List size={13} /> Liste
+          </button>
         </div>
       </div>
 
@@ -352,6 +420,15 @@ export default function SchedulePage() {
         confirmLabel="Supprimer"
         onConfirm={handleDelete}
         onCancel={() => setConfirmDelete(null)}
+      />
+
+      <ConfirmModal
+        isOpen={confirmReset}
+        title="⚠️ Réinitialiser la semaine"
+        message={`Tous les shifts de cette semaine (${filteredShifts.length} au total) seront définitivement supprimés. Cette action est irréversible.`}
+        confirmLabel={resetting ? 'Suppression…' : 'Réinitialiser'}
+        onConfirm={resetWeek}
+        onCancel={() => setConfirmReset(false)}
       />
     </div>
   )
