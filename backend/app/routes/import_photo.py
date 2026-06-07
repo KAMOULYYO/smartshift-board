@@ -30,6 +30,11 @@ async def import_from_photo(body: PhotoImportRequest, user: dict = Depends(requi
     else:
         media_type = "image/png"
 
+    # Validate media type
+    allowed_types = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+    if media_type not in allowed_types:
+        media_type = "image/png"
+
     prompt = f"""Tu es un assistant qui lit des plannings de travail.
 Analyse cette capture d'écran d'un planning et extrais TOUS les shifts (quarts de travail).
 
@@ -51,25 +56,46 @@ Retourne UNIQUEMENT un tableau JSON valide, sans texte autour. Exemple:
 Si tu ne vois aucun shift, retourne [].
 """
 
-    client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
-        model="claude-3-haiku-20240307",
-        max_tokens=4096,
-        messages=[{
-            "role": "user",
-            "content": [
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": media_type,
-                        "data": raw,
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=4096,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": raw,
+                        },
                     },
-                },
-                {"type": "text", "text": prompt},
-            ],
-        }],
-    )
+                    {"type": "text", "text": prompt},
+                ],
+            }],
+        )
+    except anthropic.RateLimitError:
+        raise HTTPException(
+            status_code=429,
+            detail="Limite de requêtes IA atteinte. Veuillez réessayer dans quelques secondes."
+        )
+    except anthropic.AuthenticationError:
+        raise HTTPException(
+            status_code=503,
+            detail="Clé API IA invalide. Contactez l'administrateur."
+        )
+    except anthropic.BadRequestError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Image invalide ou trop grande: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur IA: {str(e)}"
+        )
 
     text = message.content[0].text.strip()
 
