@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   Settings, Store, Palette, Calendar, Clock, Info,
   Save, RotateCcw, ChevronDown, ChevronUp, Sparkles,
-  Tag, Globe, Shield,
+  Tag, Globe, Shield, ImagePlus, Trash2,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -164,6 +164,26 @@ export default function SettingsPage() {
   })
 
   const [saved, setSaved] = useState(false)
+  const [logo, setLogo] = useState(() => localStorage.getItem('ssb_logo') ?? null)
+  const [dragOver, setDragOver] = useState(false)
+
+  const handleLogoFile = (file) => {
+    if (!file || !file.type.startsWith('image/')) { toast.error('Fichier image invalide'); return }
+    if (file.size > 2 * 1024 * 1024) { toast.error('Image trop lourde (max 2 Mo)'); return }
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setLogo(e.target.result)
+      localStorage.setItem('ssb_logo', e.target.result)
+      toast.success('Logo enregistré ✓')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const removeLogo = () => {
+    setLogo(null)
+    localStorage.removeItem('ssb_logo')
+    toast.success('Logo supprimé')
+  }
 
   const update = (key, val) => setSettings(s => ({ ...s, [key]: val }))
 
@@ -263,6 +283,51 @@ export default function SettingsPage() {
             Couleur actuelle : <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">{settings.primaryColor}</code>
             {' '}· Rechargez la page après enregistrement
           </p>
+        </div>
+      </Section>
+
+      {/* Logo */}
+      <Section icon={ImagePlus} title="Logo du magasin" subtitle="Affiché dans la barre latérale à la place de l'icône par défaut">
+        <div className="flex flex-col sm:flex-row gap-6 items-start">
+          {/* Aperçu */}
+          <div className="shrink-0">
+            <p className="label mb-2">Aperçu</p>
+            <div className="w-16 h-16 rounded-2xl gradient-red flex items-center justify-center overflow-hidden border-2 border-gray-100">
+              {logo
+                ? <img src={logo} alt="Logo" className="w-full h-full object-contain p-1" />
+                : <span className="text-white font-bold text-2xl">S</span>
+              }
+            </div>
+          </div>
+
+          {/* Upload zone */}
+          <div className="flex-1 w-full">
+            <p className="label mb-2">Importer un logo</p>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); handleLogoFile(e.dataTransfer.files[0]) }}
+              className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${dragOver ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:border-red-300 hover:bg-red-50/50'}`}
+              onClick={() => document.getElementById('logo-input').click()}
+            >
+              <ImagePlus size={28} className="mx-auto text-gray-300 mb-2" />
+              <p className="text-sm font-semibold text-gray-500">Glissez votre logo ici</p>
+              <p className="text-xs text-gray-400 mt-1">ou cliquez pour choisir un fichier</p>
+              <p className="text-xs text-gray-300 mt-2">PNG, JPG, SVG — max 2 Mo</p>
+              <input
+                id="logo-input"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleLogoFile(e.target.files[0])}
+              />
+            </div>
+            {logo && (
+              <button onClick={removeLogo} className="mt-3 flex items-center gap-1.5 text-sm text-red-500 hover:text-red-600 font-medium">
+                <Trash2 size={14} /> Supprimer le logo
+              </button>
+            )}
+          </div>
         </div>
       </Section>
 

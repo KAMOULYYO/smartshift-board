@@ -61,6 +61,9 @@ export default function Sidebar({ collapsed, onClose }) {
     if (window.confirm('Voulez-vous vraiment vous déconnecter ?')) logout()
   }
   const { replacements, absences } = useApp()
+  const customLogo = localStorage.getItem('ssb_logo')
+  const settings = (() => { try { return JSON.parse(localStorage.getItem('ssb_settings') ?? '{}') } catch { return {} } })()
+  const storeName = settings.storeName || 'SmartShift'
 
   const openReplacements = filterReplacementsByRole(user, replacements).filter(r => r.status === 'open').length
   const pendingAbsences  = filterAbsencesByRole(user, absences).filter(a => a.status === 'pending').length
@@ -83,11 +86,14 @@ export default function Sidebar({ collapsed, onClose }) {
         {/* Logo */}
         <div className="p-5 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 gradient-red rounded-xl flex items-center justify-center shrink-0">
-              <ShoppingCart size={18} className="text-white" />
+            <div className="w-9 h-9 gradient-red rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+              {customLogo
+                ? <img src={customLogo} alt="Logo" className="w-full h-full object-contain p-0.5" />
+                : <ShoppingCart size={18} className="text-white" />
+              }
             </div>
             <div>
-              <p className="font-bold text-gray-900 text-sm leading-none">SmartShift</p>
+              <p className="font-bold text-gray-900 text-sm leading-none">{storeName}</p>
               <p className="text-xs text-gray-400 mt-0.5">Board</p>
             </div>
           </div>
