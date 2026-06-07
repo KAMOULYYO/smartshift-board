@@ -10,6 +10,10 @@ ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 
 # Try models in order until one works
 MODELS_TO_TRY = [
+    "claude-opus-4-5",
+    "claude-sonnet-4-5",
+    "claude-haiku-4-5",
+    "claude-3-7-sonnet-20250219",
     "claude-3-5-sonnet-20241022",
     "claude-3-5-sonnet-20240620",
     "claude-3-opus-20240229",
@@ -50,6 +54,37 @@ async def call_anthropic(api_key: str, model: str, media_type: str, raw_b64: str
     async with httpx.AsyncClient(timeout=120.0) as client:
         resp = await client.post(ANTHROPIC_API_URL, headers=headers, json=payload)
     return resp.status_code, resp.json()
+
+
+@router.get("/test-models")
+async def test_models(user: dict = Depends(require_manager)):
+    """Debug: test which models are available with the current API key."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Clé API IA non configurée")
+
+    results = {}
+    for model in MODELS_TO_TRY:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    ANTHROPIC_API_URL,
+                    headers={
+                        "x-api-key": api_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    json={
+                        "model": model,
+                        "max_tokens": 10,
+                        "messages": [{"role": "user", "content": "Hi"}],
+                    },
+                )
+            results[model] = resp.status_code
+        except Exception as e:
+            results[model] = str(e)
+
+    return {"results": results, "key_prefix": api_key[:20] + "..."}
 
 
 @router.post("/photo")
