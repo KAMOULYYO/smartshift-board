@@ -1,9 +1,20 @@
-import os, base64, json, re
+import os, json, re
+import httpx
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from app.auth.dependencies import require_manager
 
 router = APIRouter(prefix="/import", tags=["import"])
+
+ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+
+# Try models in order until one works
+MODELS_TO_TRY = [
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-sonnet-20240620",
+    "claude-3-opus-20240229",
+    "claude-3-sonnet-20240229",
+]
 
 
 class PhotoImportRequest(BaseModel):
@@ -11,16 +22,41 @@ class PhotoImportRequest(BaseModel):
     week_start: str     # YYYY-MM-DD  (lundi de la semaine cible)
 
 
+async def call_anthropic(api_key: str, model: str, media_type: str, raw_b64: str, prompt: str) -> dict:
+    """Call Anthropic Messages API directly via httpx."""
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "max_tokens": 4096,
+        "messages": [{
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": raw_b64,
+                    },
+                },
+                {"type": "text", "text": prompt},
+            ],
+        }],
+    }
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        resp = await client.post(ANTHROPIC_API_URL, headers=headers, json=payload)
+    return resp.status_code, resp.json()
+
+
 @router.post("/photo")
 async def import_from_photo(body: PhotoImportRequest, user: dict = Depends(require_manager)):
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise HTTPException(status_code=503, detail="Clé API IA non configurée sur le serveur")
-
-    try:
-        import anthropic
-    except ImportError:
-        raise HTTPException(status_code=503, detail="Module anthropic non installé")
 
     # Strip data URI prefix if present
     raw = body.image_base64
@@ -30,7 +66,6 @@ async def import_from_photo(body: PhotoImportRequest, user: dict = Depends(requi
     else:
         media_type = "image/png"
 
-    # Validate media type
     allowed_types = {"image/png", "image/jpeg", "image/gif", "image/webp"}
     if media_type not in allowed_types:
         media_type = "image/png"
@@ -56,57 +91,42 @@ Retourne UNIQUEMENT un tableau JSON valide, sans texte autour. Exemple:
 Si tu ne vois aucun shift, retourne [].
 """
 
-    try:
-        client = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=4096,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": media_type,
-                            "data": raw,
-                        },
-                    },
-                    {"type": "text", "text": prompt},
-                ],
-            }],
-        )
-    except anthropic.RateLimitError:
-        raise HTTPException(
-            status_code=429,
-            detail="Limite de requêtes IA atteinte. Veuillez réessayer dans quelques secondes."
-        )
-    except anthropic.AuthenticationError:
-        raise HTTPException(
-            status_code=503,
-            detail="Clé API IA invalide. Contactez l'administrateur."
-        )
-    except anthropic.BadRequestError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Image invalide ou trop grande: {str(e)}"
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erreur IA: {str(e)}"
-        )
+    # Try each model until one succeeds
+    last_error = "Aucun modèle disponible"
+    for model in MODELS_TO_TRY:
+        try:
+            status, data = await call_anthropic(api_key, model, media_type, raw, prompt)
+        except Exception as e:
+            last_error = str(e)
+            continue
 
-    text = message.content[0].text.strip()
+        if status == 404:
+            # Model not available, try next
+            last_error = f"Modèle {model} non disponible"
+            continue
+        elif status == 429:
+            raise HTTPException(status_code=429, detail="Limite de requêtes IA atteinte. Réessayez dans quelques secondes.")
+        elif status == 401:
+            raise HTTPException(status_code=503, detail="Clé API IA invalide. Contactez l'administrateur.")
+        elif status == 400:
+            err_msg = data.get("error", {}).get("message", str(data))
+            raise HTTPException(status_code=400, detail=f"Image invalide: {err_msg}")
+        elif status != 200:
+            err_msg = data.get("error", {}).get("message", str(data))
+            last_error = f"Erreur API ({status}): {err_msg}"
+            continue
 
-    # Extract JSON array from response
-    match = re.search(r'\[.*\]', text, re.DOTALL)
-    if not match:
-        return {"shifts": [], "raw": text, "warning": "Aucun shift détecté dans l'image"}
+        # Success — parse response
+        text = data["content"][0]["text"].strip()
+        match = re.search(r'\[.*\]', text, re.DOTALL)
+        if not match:
+            return {"shifts": [], "raw": text, "warning": "Aucun shift détecté dans l'image", "model_used": model}
 
-    try:
-        shifts = json.loads(match.group())
-    except json.JSONDecodeError:
-        return {"shifts": [], "raw": text, "warning": "Impossible de parser la réponse IA"}
+        try:
+            shifts = json.loads(match.group())
+        except json.JSONDecodeError:
+            return {"shifts": [], "raw": text, "warning": "Impossible de parser la réponse IA", "model_used": model}
 
-    return {"shifts": shifts, "count": len(shifts)}
+        return {"shifts": shifts, "count": len(shifts), "model_used": model}
+
+    raise HTTPException(status_code=503, detail=f"Erreur IA: {last_error}")
