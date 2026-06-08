@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, Plus, Filter, FileDown, Share2, Send, Copy, CheckCircle2, Users, Trash2, Zap, LayoutGrid, List, RefreshCw, Camera } from 'lucide-react'
 import { exportSchedulePdf } from '../utils/exportPdf'
+import { generatePausePDF } from '../utils/pausePDF'
 import { publishPlanning, getPlanningStatus } from '../api/planningApi'
 import { addDays, subDays } from 'date-fns'
 import WeeklyCalendar from '../components/schedule/WeeklyCalendar'
@@ -25,7 +26,7 @@ const EMPTY_SHIFT = { employeeId: '', department: '', date: '', startTime: '08:0
 
 export default function SchedulePage() {
   const { user, canManage } = useAuth()
-  const { employees, shifts, absences, replacements, addShift, updateShift, deleteShift, hasShiftConflict, getEmployee } = useApp()
+  const { employees, shifts, absences, replacements, addShift, updateShift, deleteShift, hasShiftConflict, getEmployee, appSettings } = useApp()
   const { toast } = useToast()
 
   const today = getTodayDate()
@@ -283,6 +284,21 @@ export default function SchedulePage() {
             <button onClick={() => exportSchedulePdf({ weekDates, shifts: filteredShifts, employees, absences, replacements, user })}
               className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-semibold transition-all border border-white/10">
               <FileDown size={13} /> PDF
+            </button>
+            <button
+              onClick={() => generatePausePDF({
+                shifts: filteredShifts.map(s => ({
+                  ...s,
+                  employee_name: getEmployee(s.employeeId)?.name ?? s.employeeId,
+                })),
+                storeName: appSettings?.storeName || 'SmartShift',
+                logoBase64: appSettings?.logo ?? null,
+                weekLabel: `${weekDates[0]} → ${weekDates[6]}`,
+              })}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-semibold transition-all border border-white/10"
+              title="Télécharger la feuille de pauses"
+            >
+              <FileDown size={13} /> Pauses ☕
             </button>
             {canManage && filteredShifts.length > 0 && (
               <button onClick={() => setConfirmReset(true)}
