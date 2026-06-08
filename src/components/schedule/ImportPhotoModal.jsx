@@ -132,6 +132,13 @@ export default function ImportPhotoModal({ isOpen, onClose, weekStart, employees
       return true
     })
 
+    // Sort by date then start_time (matin → soir)
+    unique.sort((a, b) => {
+      const dateComp = (a.date ?? '').localeCompare(b.date ?? '')
+      if (dateComp !== 0) return dateComp
+      return (a.start_time ?? '').localeCompare(b.start_time ?? '')
+    })
+
     setWarnings(allWarnings)
     setMatchedShifts(matchEmployees(unique))
     setStep('review')
