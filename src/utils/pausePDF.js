@@ -31,13 +31,22 @@ function calcBreaks(startTime, endTime) {
   const total    = `${hh}h${String(mm).padStart(2, '0')}`
   const shiftStr = `${fmtMin(start)}–${fmtMin(end)}`
 
-  if (dur < 360) return { pause1: '—', repas: '—', pause2: '—', total, shiftStr }
+  // < 4h : aucune pause
+  if (dur < 240) return { pause1: '—', repas: '—', pause2: '—', total, shiftStr }
 
+  // 4h–5h59 : repas uniquement (30 min au milieu)
+  const rs = start + Math.floor(dur / 2) - 15
+  const re = rs + 30
+
+  if (dur < 360) {
+    return { pause1: '—', repas: `${fmtMin(rs)}–${fmtMin(re)}`, pause2: '—', total, shiftStr }
+  }
+
+  // ≥ 6h : Pause 1 + Repas
   const p1s = start + 90
   const p1e = p1s + 15
-  const rs  = start + Math.floor(dur / 2) - 15
-  const re  = rs + 30
 
+  // ≥ 8h : + Pause 2
   let pause2 = '—'
   if (dur >= 480) {
     const p2e = end - 90
@@ -248,10 +257,10 @@ export function generatePausePDF({ shifts, storeName, logoBase64, weekLabel }) {
     // ── Légende ──────────────────────────────────────────────────────────────
     const LEG_Y = TBL_Y + ROW_H * (dayShifts.length + 1) + 5
     const legends = [
-      'Pause 1 : 15 min (~1h30 après le début)',
-      'Repas : 30 min (milieu du shift)',
-      'Pause 2 : 15 min pour les shifts ≥ 8h',
-      '— : pas de pause (shift < 6h)',
+      'Pause 1 : 15 min (~1h30 après début) — shifts ≥ 6h',
+      'Repas : 30 min (milieu du shift) — shifts ≥ 4h',
+      'Pause 2 : 15 min — shifts ≥ 8h',
+      '— : shift < 4h, aucune pause',
     ]
     doc.setTextColor(...GRAY)
     doc.setFont('helvetica', 'italic')
