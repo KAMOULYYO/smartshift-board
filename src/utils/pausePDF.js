@@ -2,77 +2,60 @@ import { jsPDF } from 'jspdf'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Helpers temps ────────────────────────────────────────────────────────────
 
-function fmtMin(totalMin) {
-  const h = Math.floor(totalMin / 60)
-  const m = totalMin % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+function fmtMin(m) {
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 }
 
-function parseMin(timeStr) {
-  if (!timeStr || timeStr === 'undefined') return null
-  const [h, m] = timeStr.split(':').map(Number)
-  if (isNaN(h) || isNaN(m)) return null
-  return h * 60 + m
+function parseMin(t) {
+  if (!t || t === 'undefined' || !t.includes(':')) return null
+  const [h, m] = t.split(':').map(Number)
+  return isNaN(h) || isNaN(m) ? null : h * 60 + m
 }
 
 function calcBreaks(startTime, endTime) {
-  const start = parseMin(startTime)
-  const end   = parseMin(endTime)
-
-  if (start === null || end === null || end <= start) {
-    return { pause1: '—', repas: '—', pause2: '—', total: '—', shiftStr: '—' }
+  const s = parseMin(startTime)
+  const e = parseMin(endTime)
+  if (s === null || e === null || e <= s) {
+    return { shiftStr: '—', pause1: '—', repas: '—', pause2: '—', total: '—' }
   }
-
-  const dur = end - start
+  const dur = e - s
   const hh  = Math.floor(dur / 60)
   const mm  = dur % 60
   const total    = `${hh}h${String(mm).padStart(2, '0')}`
-  const shiftStr = `${fmtMin(start)}–${fmtMin(end)}`
+  const shiftStr = `${fmtMin(s)}–${fmtMin(e)}`
 
-  // < 4h : aucune pause
-  if (dur < 240) return { pause1: '—', repas: '—', pause2: '—', total, shiftStr }
+  if (dur < 240) return { shiftStr, pause1: '—', repas: '—', pause2: '—', total }
 
-  // 4h–5h59 : repas uniquement (30 min au milieu)
-  const rs = start + Math.floor(dur / 2) - 15
+  const rs = s + Math.floor(dur / 2) - 15
   const re = rs + 30
 
   if (dur < 360) {
-    return { pause1: '—', repas: `${fmtMin(rs)}–${fmtMin(re)}`, pause2: '—', total, shiftStr }
+    return { shiftStr, pause1: '—', repas: `${fmtMin(rs)}–${fmtMin(re)}`, pause2: '—', total }
   }
 
-  // ≥ 6h : Pause 1 + Repas
-  const p1s = start + 90
+  const p1s = s + 90
   const p1e = p1s + 15
 
-  // ≥ 8h : + Pause 2
   let pause2 = '—'
   if (dur >= 480) {
-    const p2e = end - 90
-    const p2s = p2e - 15
-    pause2 = `${fmtMin(p2s)}–${fmtMin(p2e)}`
+    const p2e = e - 90
+    pause2 = `${fmtMin(p2e - 15)}–${fmtMin(p2e)}`
   }
 
-  return {
-    shiftStr,
-    pause1: `${fmtMin(p1s)}–${fmtMin(p1e)}`,
-    repas:  `${fmtMin(rs)}–${fmtMin(re)}`,
-    pause2,
-    total,
-  }
+  return { shiftStr, pause1: `${fmtMin(p1s)}–${fmtMin(p1e)}`, repas: `${fmtMin(rs)}–${fmtMin(re)}`, pause2, total }
 }
 
 function groupByDay(shifts) {
   const map = {}
   for (const s of shifts) {
-    const date = s.date
-    if (!date) continue
-    if (!map[date]) map[date] = []
-    map[date].push(s)
+    if (!s.date) continue
+    if (!map[s.date]) map[s.date] = []
+    map[s.date].push(s)
   }
-  for (const date of Object.keys(map)) {
-    map[date].sort((a, b) => {
+  for (const d of Object.keys(map)) {
+    map[d].sort((a, b) => {
       const at = a.startTime ?? a.start_time ?? ''
       const bt = b.startTime ?? b.start_time ?? ''
       return at.localeCompare(bt)
@@ -81,22 +64,12 @@ function groupByDay(shifts) {
   return map
 }
 
-// ─── Couleurs rouge uniquement ───────────────────────────────────────────────
-const RED       = [198, 22,  22 ]
-const RED_DARK  = [155, 10,  10 ]
-const RED_LIGHT = [254, 226, 226]
-const WHITE     = [255, 255, 255]
-const DARK      = [30,  30,  30 ]
-const GRAY      = [120, 120, 120]
-const LGRAY     = [245, 245, 245]
-const MGRAY     = [220, 220, 220]
-
-// ─── Main export ─────────────────────────────────────────────────────────────
+// ─── PDF ──────────────────────────────────────────────────────────────────────
 
 export function generatePausePDF({ shifts, storeName, logoBase64, weekLabel }) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-  const PW  = doc.internal.pageSize.getWidth()   // 297
-  const PH  = doc.internal.pageSize.getHeight()  // 210
+  const PW = doc.internal.pageSize.getWidth()   // 297
+  const PH = doc.internal.pageSize.getHeight()  // 210
 
   const byDay = groupByDay(shifts)
   const dates = Object.keys(byDay).sort()
@@ -106,212 +79,199 @@ export function generatePausePDF({ shifts, storeName, logoBase64, weekLabel }) {
     if (pageIdx > 0) doc.addPage()
 
     const dayShifts = byDay[date]
-
     let dateObj
     try { dateObj = parseISO(date) } catch { dateObj = new Date(date) }
-    const dayLabel  = format(dateObj, 'EEEE', { locale: fr }).toUpperCase()
-    const dateLong  = format(dateObj, 'd MMMM yyyy', { locale: fr })
+    const dayLabel = format(dateObj, 'EEEE', { locale: fr }).toUpperCase()
+    const dateLong = format(dateObj, 'd MMMM yyyy', { locale: fr })
 
-    // ── Page background blanc ────────────────────────────────────────────────
-    doc.setFillColor(...WHITE)
+    // ── Fond blanc ──
+    doc.setFillColor(255, 255, 255)
     doc.rect(0, 0, PW, PH, 'F')
 
-    // ── Header principal ─────────────────────────────────────────────────────
-    const HEADER_H = 42
-    doc.setFillColor(...RED)
-    doc.rect(0, 0, PW, HEADER_H, 'F')
+    // ── Header rouge ──
+    doc.setFillColor(198, 22, 22)
+    doc.rect(0, 0, PW, 40, 'F')
 
-    // Bande logo à gauche (rouge foncé)
-    const LOGO_W = 55
-    doc.setFillColor(...RED_DARK)
-    doc.rect(0, 0, LOGO_W, HEADER_H, 'F')
+    // Zone logo (rouge foncé)
+    doc.setFillColor(155, 10, 10)
+    doc.rect(0, 0, 54, 40, 'F')
 
-    // ── Logo ─────────────────────────────────────────────────────────────────
+    // Logo image ou initiales
     if (logoBase64 && logoBase64.startsWith('data:image')) {
       try {
         const ext = logoBase64.toLowerCase().includes('png') ? 'PNG' : 'JPEG'
-        // Centré dans la zone logo
-        doc.addImage(logoBase64, ext, 6, 5, 43, 32, undefined, 'FAST')
+        doc.addImage(logoBase64, ext, 5, 5, 44, 30, undefined, 'FAST')
       } catch {
-        drawTextLogo(doc, storeName, LOGO_W / 2, HEADER_H / 2)
+        // fallback texte
+        doc.setTextColor(255, 255, 255)
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(16)
+        const ini = (storeName || 'SS').split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()
+        doc.text(ini, 27, 24, { align: 'center' })
       }
     } else {
-      drawTextLogo(doc, storeName, LOGO_W / 2, HEADER_H / 2)
+      doc.setTextColor(255, 255, 255)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(18)
+      const ini = (storeName || 'SS').split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()
+      doc.text(ini, 27, 25, { align: 'center' })
     }
 
-    // ── Nom du magasin ───────────────────────────────────────────────────────
-    doc.setTextColor(...WHITE)
+    // Nom du magasin
+    doc.setTextColor(255, 255, 255)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(20)
-    doc.text((storeName || 'SmartShift').toUpperCase(), LOGO_W + 8, 18)
+    doc.setFontSize(18)
+    doc.text((storeName || 'SmartShift').toUpperCase(), 60, 17)
 
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(255, 200, 200)
-    doc.text('Rapport planning — Horaire des pauses', LOGO_W + 8, 27)
+    doc.text('Rapport planning — Horaire des pauses', 60, 25)
 
-    // ── Coin haut droite ─────────────────────────────────────────────────────
-    doc.setTextColor(255, 200, 200)
+    // Coin droit
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(8)
-    doc.text('SmartShift Board', PW - 10, 14, { align: 'right' })
+    doc.setTextColor(255, 255, 255)
+    doc.text('SmartShift Board', PW - 8, 13, { align: 'right' })
+
+    // Semaine
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7)
-
-    // Format weekLabel proprement
+    doc.setTextColor(255, 200, 200)
     const wl = (weekLabel || '').replace(/(\d{4}-\d{2}-\d{2})/g, (m) => {
       try { return format(parseISO(m), 'd MMM yyyy', { locale: fr }) } catch { return m }
     })
-    doc.text(wl, PW - 10, 21, { align: 'right' })
+    doc.text(wl, PW - 8, 20, { align: 'right' })
 
-    // ── Bandeau jour ─────────────────────────────────────────────────────────
-    const DAY_Y = HEADER_H + 4
-    doc.setFillColor(...RED_LIGHT)
-    doc.rect(10, DAY_Y, PW - 20, 9, 'F')
-    doc.setDrawColor(...RED)
-    doc.setLineWidth(0.5)
-    doc.rect(10, DAY_Y, PW - 20, 9, 'S')
+    // ── Bandeau jour ──
+    doc.setFillColor(254, 226, 226)
+    doc.rect(10, 44, PW - 20, 9, 'F')
+    doc.setDrawColor(198, 22, 22)
+    doc.setLineWidth(0.4)
+    doc.rect(10, 44, PW - 20, 9, 'S')
 
-    doc.setTextColor(...RED_DARK)
+    doc.setTextColor(155, 10, 10)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
-    doc.text(`${dayLabel}  —  ${dateLong}`, 15, DAY_Y + 6)
+    doc.text(`${dayLabel}  —  ${dateLong}`, 15, 50.5)
 
-    // ── Tableau ──────────────────────────────────────────────────────────────
-    const TBL_Y = DAY_Y + 13
-    // Colonnes : Employé, Shift, Pause 1, Repas, Pause 2, Total
+    // ── Tableau ──
+    const TY = 57
+    const ROW = 9
     const cols = [
-      { label: 'Employé',    w: 62 },
-      { label: 'Shift',      w: 30 },
-      { label: 'Pause 1',    w: 40 },
-      { label: 'Repas',      w: 40 },
-      { label: 'Pause 2',    w: 40 },
-      { label: 'Total',      w: 26 },
+      { label: 'Employé',  w: 60 },
+      { label: 'Shift',    w: 30 },
+      { label: 'Pause 1',  w: 38 },
+      { label: 'Repas',    w: 38 },
+      { label: 'Pause 2',  w: 38 },
+      { label: 'Total',    w: 26 },
     ]
-    const totalW = cols.reduce((s, c) => s + c.w, 0)  // 238
-    const marginL = (PW - totalW) / 2
-    const ROW_H = 9
+    const TW = cols.reduce((s, c) => s + c.w, 0)
+    const ML = (PW - TW) / 2
 
-    // Construire les X de départ
+    // Calcul des X
     const xs = []
-    let cx = marginL
-    for (const col of cols) { xs.push(cx); cx += col.w }
+    let cx = ML
+    cols.forEach(c => { xs.push(cx); cx += c.w })
 
-    // En-tête tableau
-    doc.setFillColor(...RED)
-    doc.rect(marginL, TBL_Y, totalW, ROW_H, 'F')
-
-    cols.forEach((col, i) => {
-      doc.setTextColor(...WHITE)
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(8)
-      doc.text(col.label, xs[i] + col.w / 2, TBL_Y + 6, { align: 'center' })
+    // En-tête
+    doc.setFillColor(198, 22, 22)
+    doc.rect(ML, TY, TW, ROW, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    cols.forEach((c, i) => {
+      doc.text(c.label, xs[i] + c.w / 2, TY + 6, { align: 'center' })
     })
 
-    // Séparateurs colonnes dans l'en-tête
-    doc.setDrawColor(255, 150, 150)
+    // Lignes séparatrices en-tête
+    doc.setDrawColor(220, 100, 100)
     doc.setLineWidth(0.2)
     for (let i = 1; i < cols.length; i++) {
-      doc.line(xs[i], TBL_Y, xs[i], TBL_Y + ROW_H)
+      doc.line(xs[i], TY, xs[i], TY + ROW)
     }
 
-    // Lignes de données
+    // Données
     dayShifts.forEach((shift, ri) => {
-      const ry = TBL_Y + ROW_H * (ri + 1)
+      const ry = TY + ROW * (ri + 1)
       const st = shift.startTime ?? shift.start_time
       const et = shift.endTime   ?? shift.end_time
       const br = calcBreaks(st, et)
-      const name = shift.employee_name ?? shift.employeeName ?? '—'
+      const name = (shift.employee_name ?? shift.employeeName ?? '—').slice(0, 28)
 
       // Fond alternant
-      doc.setFillColor(...(ri % 2 === 0 ? WHITE : LGRAY))
-      doc.rect(marginL, ry, totalW, ROW_H, 'F')
+      doc.setFillColor(ri % 2 === 0 ? 255 : 248, ri % 2 === 0 ? 255 : 248, ri % 2 === 0 ? 255 : 248)
+      doc.rect(ML, ry, TW, ROW, 'F')
 
-      // Bordure
-      doc.setDrawColor(...MGRAY)
+      // Bordure ligne
+      doc.setDrawColor(220, 220, 220)
       doc.setLineWidth(0.2)
-      doc.rect(marginL, ry, totalW, ROW_H, 'S')
+      doc.rect(ML, ry, TW, ROW, 'S')
 
       // Séparateurs colonnes
       for (let i = 1; i < cols.length; i++) {
-        doc.setDrawColor(...MGRAY)
-        doc.line(xs[i], ry, xs[i], ry + ROW_H)
+        doc.line(xs[i], ry, xs[i], ry + ROW)
       }
 
+      // Textes
       const cells = [name, br.shiftStr, br.pause1, br.repas, br.pause2, br.total]
       cells.forEach((txt, ci) => {
-        const isBold = ci === 0 || ci === cols.length - 1
-        const isNA   = txt === '—'
-        doc.setFont('helvetica', isBold ? 'bold' : 'normal')
+        const bold = ci === 0 || ci === 5
+        const gray = txt === '—'
+        doc.setFont('helvetica', bold ? 'bold' : 'normal')
         doc.setFontSize(8)
-        doc.setTextColor(...(isNA ? GRAY : DARK))
+        doc.setTextColor(gray ? 180 : 30, gray ? 180 : 30, gray ? 180 : 30)
         doc.text(txt, xs[ci] + cols[ci].w / 2, ry + 6, { align: 'center' })
       })
     })
 
-    // Bordure externe du tableau
-    doc.setDrawColor(...RED)
+    // Bordure externe tableau
+    doc.setDrawColor(198, 22, 22)
     doc.setLineWidth(0.5)
-    doc.rect(marginL, TBL_Y, totalW, ROW_H * (dayShifts.length + 1), 'S')
+    doc.rect(ML, TY, TW, ROW * (dayShifts.length + 1), 'S')
 
-    // ── Légende ──────────────────────────────────────────────────────────────
-    const LEG_Y = TBL_Y + ROW_H * (dayShifts.length + 1) + 5
-    const legends = [
-      'Pause 1 : 15 min (~1h30 après début) — shifts ≥ 6h',
-      'Repas : 30 min (milieu du shift) — shifts ≥ 4h',
-      'Pause 2 : 15 min — shifts ≥ 8h',
-      '— : shift < 4h, aucune pause',
-    ]
-    doc.setTextColor(...GRAY)
-    doc.setFont('helvetica', 'italic')
+    // ── Légende ──
+    const LY = TY + ROW * (dayShifts.length + 1) + 5
+    doc.setFont('helvetica', 'normal')
     doc.setFontSize(6.5)
-    let lx = marginL
-    legends.forEach((leg, i) => {
-      doc.text(`• ${leg}`, lx, LEG_Y)
-      lx += doc.getTextWidth(`• ${leg}`) + 8
+    doc.setTextColor(140, 140, 140)
+    const legtexts = [
+      '• Pause 1 : 15 min (~1h30 après le début) — shift ≥ 6h',
+      '• Repas : 30 min (milieu du shift) — shift ≥ 4h',
+      '• Pause 2 : 15 min — shift ≥ 8h',
+      '• — : shift < 4h',
+    ]
+    let lx = ML
+    legtexts.forEach(t => {
+      doc.text(t, lx, LY)
+      lx += doc.getTextWidth(t) + 6
     })
 
-    // ── Section NOTE ─────────────────────────────────────────────────────────
-    const NOTE_Y = PH - 40
-    // Label NOTE
-    doc.setFillColor(...RED)
-    doc.rect(marginL, NOTE_Y, 22, 7, 'F')
-    doc.setTextColor(...WHITE)
+    // ── Section NOTE ──
+    const NY = PH - 42
+    doc.setFillColor(198, 22, 22)
+    doc.rect(ML, NY, 20, 7, 'F')
+    doc.setTextColor(255, 255, 255)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(8)
-    doc.text('NOTE', marginL + 4, NOTE_Y + 5)
+    doc.text('NOTE', ML + 3, NY + 5)
 
-    // Lignes de notes
-    doc.setDrawColor(...MGRAY)
+    doc.setDrawColor(200, 200, 200)
     doc.setLineWidth(0.3)
     for (let i = 0; i < 3; i++) {
-      const lineY = NOTE_Y + 11 + i * 8
-      doc.line(marginL, lineY, marginL + totalW, lineY)
+      doc.line(ML, NY + 10 + i * 8, ML + TW, NY + 10 + i * 8)
     }
 
-    // ── Footer ───────────────────────────────────────────────────────────────
-    doc.setFillColor(...RED_DARK)
+    // ── Footer ──
+    doc.setFillColor(155, 10, 10)
     doc.rect(0, PH - 8, PW, 8, 'F')
     doc.setTextColor(255, 200, 200)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(6.5)
-    doc.text(`Document interne — SmartShift Board — ${storeName || ''}`, 10, PH - 3)
-    doc.text(`Page ${pageIdx + 1} / ${dates.length}`, PW - 10, PH - 3, { align: 'right' })
+    doc.text(`Document interne — SmartShift Board — ${storeName || ''}`, 8, PH - 3)
+    doc.text(`Page ${pageIdx + 1} / ${dates.length}`, PW - 8, PH - 3, { align: 'right' })
   })
 
   const safeName = (storeName || 'planning').replace(/[^a-z0-9]/gi, '_')
   doc.save(`feuille_pauses_${safeName}_${dates[0] ?? ''}.pdf`)
-}
-
-// ─── Dessin logo texte ────────────────────────────────────────────────────────
-
-function drawTextLogo(doc, name, cx, cy) {
-  const initials = (name || 'S')
-    .split(/\s+/).map(w => w[0]?.toUpperCase() ?? '').join('').slice(0, 2) || 'SS'
-  doc.setFillColor(255, 255, 255, 30)
-  doc.circle(cx, cy, 14, 'F')
-  doc.setTextColor(255, 255, 255)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(14)
-  doc.text(initials, cx, cy + 5, { align: 'center' })
 }
