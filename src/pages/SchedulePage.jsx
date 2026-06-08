@@ -286,15 +286,23 @@ export default function SchedulePage() {
               <FileDown size={13} /> PDF
             </button>
             <button
-              onClick={() => generatePausePDF({
-                shifts: filteredShifts.map(s => ({
+              onClick={() => {
+                const pdfShifts = filteredShifts.map(s => ({
                   ...s,
                   employee_name: getEmployee(s.employeeId)?.name ?? s.employeeId,
-                })),
-                storeName: appSettings?.storeName || 'SmartShift',
-                logoBase64: appSettings?.logo ?? null,
-                weekLabel: `${weekDates[0]} → ${weekDates[6]}`,
-              })}
+                }))
+                if (pdfShifts.length === 0) {
+                  toast.error('Aucun shift cette semaine à exporter')
+                  return
+                }
+                console.log('[PausePDF] premier shift:', JSON.stringify(pdfShifts[0]))
+                generatePausePDF({
+                  shifts: pdfShifts,
+                  storeName: appSettings?.storeName || 'SmartShift',
+                  logoBase64: appSettings?.logo ?? null,
+                  weekLabel: `${weekDates[0]} → ${weekDates[6]}`,
+                })
+              }}
               className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-semibold transition-all border border-white/10"
               title="Télécharger la feuille de pauses"
             >
