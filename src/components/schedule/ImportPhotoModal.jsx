@@ -11,12 +11,28 @@ function slugName(name) {
     .replace(/^\.|\.$/, '')
 }
 
+function generatePassword() {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+  const lower = 'abcdefghjkmnpqrstuvwxyz'
+  const digits = '23456789'
+  const special = '!@#$'
+  const all = upper + lower + digits + special
+  let pwd = ''
+  pwd += upper[Math.floor(Math.random() * upper.length)]
+  pwd += lower[Math.floor(Math.random() * lower.length)]
+  pwd += digits[Math.floor(Math.random() * digits.length)]
+  pwd += special[Math.floor(Math.random() * special.length)]
+  for (let i = 0; i < 4; i++) pwd += all[Math.floor(Math.random() * all.length)]
+  // Shuffle
+  return pwd.split('').sort(() => Math.random() - 0.5).join('')
+}
+
 function generateCredentials(name) {
   const parts = name.trim().split(/\s+/)
   const first = slugName(parts[0] ?? 'employe')
   const last  = slugName(parts[1] ?? 'nouveau')
   const email = `${first}.${last}@smartshift.fr`
-  const password = 'Shift2024!'
+  const password = generatePassword()
   return { email, password }
 }
 
