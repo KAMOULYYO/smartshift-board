@@ -47,6 +47,44 @@ function calcBreaks(startTime, endTime) {
   return { shiftStr, pause1: `${fmtMin(p1s)}–${fmtMin(p1e)}`, repas: `${fmtMin(rs)}–${fmtMin(re)}`, pause2, total }
 }
 
+// ─── Logo supermarché (dessiné sans image) ────────────────────────────────────
+
+function drawStoreLogo(doc, cx, cy, storeName) {
+  // Fond cercle blanc
+  doc.setFillColor(255, 255, 255)
+  doc.rect(cx - 14, cy - 14, 28, 28, 'F')
+
+  // Toit du magasin (triangle simulé avec trapèze)
+  doc.setFillColor(198, 22, 22)
+  doc.rect(cx - 13, cy - 12, 26, 4, 'F')   // bande rouge toit
+
+  // Corps du bâtiment
+  doc.setFillColor(240, 240, 240)
+  doc.rect(cx - 10, cy - 8, 20, 14, 'F')
+
+  // Porte
+  doc.setFillColor(198, 22, 22)
+  doc.rect(cx - 3, cy + 1, 6, 5, 'F')
+
+  // Vitrine gauche
+  doc.setFillColor(200, 230, 255)
+  doc.rect(cx - 9, cy - 5, 5, 5, 'F')
+
+  // Vitrine droite
+  doc.rect(cx + 4, cy - 5, 5, 5, 'F')
+
+  // Sol
+  doc.setFillColor(155, 10, 10)
+  doc.rect(cx - 14, cy + 6, 28, 2, 'F')
+
+  // Initiales en dessous
+  const ini = (storeName || 'SS').split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 3).toUpperCase()
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7)
+  doc.setTextColor(255, 255, 255)
+  doc.text(ini, cx, cy + 13, { align: 'center' })
+}
+
 function groupByDay(shifts) {
   const map = {}
   for (const s of shifts) {
@@ -96,26 +134,8 @@ export function generatePausePDF({ shifts, storeName, logoBase64, weekLabel }) {
     doc.setFillColor(155, 10, 10)
     doc.rect(0, 0, 54, 40, 'F')
 
-    // Logo image ou initiales
-    if (logoBase64 && logoBase64.startsWith('data:image')) {
-      try {
-        const ext = logoBase64.toLowerCase().includes('png') ? 'PNG' : 'JPEG'
-        doc.addImage(logoBase64, ext, 5, 5, 44, 30, undefined, 'FAST')
-      } catch {
-        // fallback texte
-        doc.setTextColor(255, 255, 255)
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(16)
-        const ini = (storeName || 'SS').split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()
-        doc.text(ini, 27, 24, { align: 'center' })
-      }
-    } else {
-      doc.setTextColor(255, 255, 255)
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(18)
-      const ini = (storeName || 'SS').split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()
-      doc.text(ini, 27, 25, { align: 'center' })
-    }
+    // Logo supermarché dessiné (formes basiques, aucune image)
+    drawStoreLogo(doc, 27, 20, storeName)
 
     // Nom du magasin
     doc.setTextColor(255, 255, 255)
